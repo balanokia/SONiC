@@ -34,6 +34,8 @@
 
         * [Uplink Interface Tracking](#uplink-interface-tracking)
 
+    * #### Nomenclature of Linux Kernel MACVLAN child interface
+
     * [Architecture Design](#architecture-design)
 
     * [High-Level Design](#high-level-design)
@@ -89,7 +91,7 @@
 | Rev | Date        | Author        | Change Description |
 | :-- | :---------- | :----------   | :----------------- |
 | 0.1 | Aug-16-2023 | Philo-micas   | Initial version    |
-| 0.2 | Sep-09-2026 | Balachandar Rajarathinam (Nokia)  | 1. VIP datatype (oc-inet:ip-address) as per IETF <br> 2. vrrpmgrd in swss container as per SONiC NBI <br> 3. Nomenclature of macvlan child device
+| 0.2 | Sep-09-2026 | Balachandar Rajarathinam (Nokia)  | 1. VIP datatype (oc-inet:ip-address) as per IETF <br> 2. SONiC architectural alignment for vrrpmgrd in swss container <br> 3. Nomenclature of macvlan child device
 
 ### Scope
 
@@ -285,9 +287,9 @@ vrrpmgrd:
 
   * Add/del Linux Macvlan device to kernel
 
-  * Config virtual MAC to Macvlan device;
+  * Config virtual MAC to Macvlan device
 
-  * Add/del VIP to Macvlan device;
+  * Add/del VIP to Macvlan device. Prefix len shall be inherited from parent interface
 
   * Upadate VRRP instance configuration to the APPL DB.
 
@@ -389,7 +391,7 @@ admin@sonic:~$ redis-cli -n 4 HGETALL " VRRP|Vlan10|10"
 "vrid"
 "10"
 "vip"
-"4.1.1.100/24,4.1.1.200/24,2000::50/64"
+"4.1.1.100,4.1.1.200,2000::50"
 "priority"
 "100"
 "adv_interval"
