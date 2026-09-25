@@ -89,7 +89,7 @@
 | Rev | Date        | Author        | Change Description |
 | :-- | :---------- | :----------   | :----------------- |
 | 0.1 | Aug-16-2023 | Philo-micas   | Initial version    |
-| 0.2 | Sep-09-2026 | Balachandar Rajarathinam (Nokia)  | VIP datatype (inet:ip-address) as per IETF                |
+| 0.2 | Sep-09-2026 | Balachandar Rajarathinam (Nokia)  | 1. VIP datatype (oc-inet:ip-address) as per IETF <br> 2. vrrpmgrd in swss container as per SONiC NBI <br> 3. Nomenclature of macvlan child device
 
 ### Scope
 
@@ -101,7 +101,7 @@ Table 1: Abbreviations
 
 | Abbreviation  | Description                                                                                                         |
 | :------------ | :------------------------------------------------------------------------------------------------------------------ |
-| VRRP          | Virtual Router Redundency Protocol                                                                                  |
+| VRRP          | Virtual Router Redundancy Protocol                                                                                  |
 | ARP           | Address Resolution Protocol                                                                                         |
 | FRR           | Free Range Routing Stack                                                                                            |
 | CLI           | Command Line Interface                                                                                              |
@@ -148,30 +148,30 @@ Suppose that the IPv4 and IPv6 addresses you want to back up are 10.0.2.16 and 2
 If you are using iproute2, the configuration is as follows:
 
 ```
-ip link add vrrp4-2-1 link eth0 addrgenmode random type macvlan mode bridge
-ip link set dev vrrp4-2-1 address 00:00:5e:00:01:05
-ip addr add 10.0.2.16/24 dev vrrp4-2-1
-ip link set dev vrrp4-2-1 up
+ip link add Vrrp4-5-v0001 link eth0 addrgenmode random type macvlan mode bridge
+ip link set dev Vrrp4-5-v0001 address 00:00:5e:00:01:05
+ip addr add 10.0.2.16/24 dev Vrrp4-5-v0001
+ip link set dev Vrrp4-5-v0001 up
 
-ip link add vrrp6-2-1 link eth0 addrgenmode random type macvlan mode bridge
-ip link set dev vrrp6-2-1 address 00:00:5e:00:02:05
-ip addr add 2001:db8::370:7334/64 dev vrrp6-2-1
-ip link set dev vrrp6-2-1 up
+ip link add Vrrp6-5-v0001 link eth0 addrgenmode random type macvlan mode bridge
+ip link set dev Vrrp6-5-v0001 address 00:00:5e:00:02:05
+ip addr add 2001:db8::370:7334/64 dev Vrrp6-5-v0001
+ip link set dev Vrrp6-5-v0001 up
 ```
 
 The created interfaces will look like this:
 
 ```
-$ ip addr show vrrp4-2-1
-5: vrrp4-2-1@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+$ ip addr show Vrrp4-5-v0001
+5: Vrrp4-5-v0001@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
     link/ether 00:00:5e:00:01:05 brd ff:ff:ff:ff:ff:ff
-    inet 10.0.2.16/24 scope global vrrp4-2-1
+    inet 10.0.2.16/24 scope global Vrrp4-5-v0001
        valid_lft forever preferred_lft forever
     inet6 fe80::dc56:d11a:e69d:ea72/64 scope link stable-privacy
        valid_lft forever preferred_lft forever
 
-$ ip addr show vrrp6-2-1
-8: vrrp6-2-1@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+$ ip addr show Vrrp6-5-v0001
+8: Vrrp6-5-v0001@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
  link/ether 00:00:5e:00:02:05 brd ff:ff:ff:ff:ff:ff
  inet6 2001:db8::370:7334/64 scope global
     valid_lft forever preferred_lft forever
@@ -179,9 +179,9 @@ $ ip addr show vrrp6-2-1
     valid_lft forever preferred_lft forever
 ```
 
-Using vrrp4-2-1 as an example, a few things to note about this interface:
+Using Vrrp4-5-v0001 as an example, a few things to note about this interface:
 
-* It is slaved to eth0; any packets transmitted on this interface will egress via eth0
+* It is a child interface (stacked over parent) to eth0; any packets transmitted on this interface will egress via eth0
 
 * Its MAC address is set to the VRRP IPv4 virtual MAC specified by the RFC for VRID 5
 
@@ -226,9 +226,29 @@ The point of failure which VRRP safeguards against is the interface on which VRR
 
 As shown in the figure，Configure VRRP backup groups between RouterA and RouterB, Both RouterA and RouterB operate in preemptive mode. On RouterA, configure to monitor the uplink interface Interface1. When Interface1 fails, RouterA lowers its priority and, through packet negotiation, RouterB preempts and becomes the Master, ensuring that user traffic is forwarded normally.
 
+#### Nomenclature of Linux Kernel MACVLAN child interface
+In Linux, network interface names (`IFNAMSIZ`) are strictly limited to **15 characters**. Here the encoding thats VRRPv3 compliant, <br>
+Syntax: Vrrp<afi, 4/6>-<vrid-in-hex, hh>-<ParentInterfaceType, char><dev-id-in-hex, hhhh> <br>
+Example, Vrrp4-5-v0001 <br>
+Parent type class (e|p|v|s),
+* Type e to denote L3 physical single interface
+* Type p to denote L3 physical bundle/LAG interface
+* Type v to denote L3 logical VLAN interface
+* Type s to denote L3 logical VLAN subinterface
+
+There will be a free-running counter(4-digit hex) to index max of 64k for each associated parent interface map index.
+
+| Segment | Components | Characters | Cumulative Length |
+| --- | --- | --- | --- |
+| **Prefix** | `Vrrp4-` or `Vrrp6-` | 6 | 6 |
+| **VRID** | `hh` (2-digit Hex value, `01` to `fe`) | 2 | 8 |
+| **Separator** | `-` | 1 | 9 |
+| **Class** | `c` (`e`, `p`, `v`, or `s`) | 1 | 10 |
+| **Parent interface map index** | `hhhh` (4-digit Hex counter) | 4 | **14 characters** |
+
 ### Architecture Design
 
-Currently, in order to enable the FRR-VRRP function, it is necessary to configure the corresponding Linux Macvlan devices externally on FRR to implement the shared virtual MAC function of the protocol. Considering the overall architecture of SONiC, it has been decided to add vrrpmgr and vrrpsyncd in bgp container, and vrrporch in swss container to implement this operation.
+Currently, in order to enable the FRR-VRRP function, it is necessary to configure the corresponding Linux Macvlan devices externally on FRR to implement the shared virtual MAC function of the protocol. 
 At a high level below are some of the interactions between relevant components and the DB involved for VRRP support in SONiC architecture.
 
 ![1.00](images/VRRP_Architecture_Diagram.png "Figure 2: VRRP in SONiC Architecture")
@@ -251,13 +271,15 @@ Since support for placing macvlan devices into protodown was not added to Linux 
 
 ##### BGP container
 
-vrrpcfgd:
+frrcfgd:
 
 * Subscribes to CONFIG\_DB tables, parsing configurations and passes to vrrpd by using FRR CLI commands.
   vrrpd:
 
 * Responsible for all VRRP protocol related calculations. VRRP packets are sent and received in vrrpd and states are updated accordingly.
-  vrrpmgrd:
+
+##### SWSS container
+vrrpmgrd:
 
 * Listens to VRRP create, delete and parameter change in CONFIG\_DB. Complete the following tasks:
 
@@ -268,7 +290,8 @@ vrrpcfgd:
   * Add/del VIP to Macvlan device;
 
   * Upadate VRRP instance configuration to the APPL DB.
-    vrrpsyncd:
+
+vrrpsyncd:
 
 * Complete the following tasks:
 
@@ -279,8 +302,6 @@ vrrpcfgd:
   * Match VRRP instance tracking interface and recalculate priority.
 
   * Update priority change to vrrpd by using FRR CLI commands.
-
-##### SWSS container
 
 Vrrporch:
 
@@ -734,4 +755,3 @@ This enhancement will support FRR-ISIS features used in SONiC and all changes wi
   * sonic-utilities/show
 
   * sonic-utilities/tests
-
